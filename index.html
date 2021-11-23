@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>three.js webgl - loaders - MMD loader</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+    <style>
+        body {
+            background-color: #fff;
+            color: #444;
+        }
+
+        a {
+            color: #08f;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info"></div>
+
+    <script src="js/libs/ammo.wasm.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/t109598105/ScoreOutputer@latest/dist/scoreoutputer.min.js"></script>
+    <script>
+        // 建構子 ScoreOutputer 接受一個字串，該字串為 csv 的檔案名稱
+        // 以下面範例，檔名就為 "109598018(總分: 6).csv"
+        var so = new ScoreOutputer("109598018");
+        so.installCSS(function () {
+            // 安裝 bootstrap 的 css，如果在 html 上方引用 bootstrap 5.1.1 的話就不用使用 installCSS ，注意一定要 bootstrap css 5.1.1 版
+            // installCSS 接收一個 callback 當作參數，作為成功安裝 bootstrap css 的回呼函式
+
+            //加入項目，分數，完成狀況
+            //第一個參數為 項目名稱
+            //第2個參數為 項目分數
+            //第3個參數為 完成狀況，有完成 true/未完成 false
+            //有幾個項目就呼叫幾個 addChild
+            //addChild 要比 renderModal 先呼叫
+            so.addChild("產生 42 個參數的 gui", 4, true);
+            so.addChild("按 A 鍵切換為上一隻、按 D 鍵為下一隻 ( gui 跟角色要同時切換 )", 4, true);
+            so.addChild("讀取作業 3 與 作業 4 儲存的 label 表將可控制的 Morph 生成在右邊的 gui", 2, true);
+
+            //產生自評表，參數如下所示
+            so.renderModal(
+                //1. 自評表插入位置 (預設 document.body)
+                document.body,
+                //2. 自評表背景 (預設紅色)
+                'rgba(100,45,58,1)',
+                //3. 自評表文字顏色 (預設白色)
+                'white',
+                //4. 自評表文字大小 (預設 14pt)
+                '15pt',
+                //5. 自評表 checkbox 文字大小 (預設多少忘了)
+                '15px',
+                //6. 自評表標題 (預設 "自我評分表")
+                dialogTitle = "自我評分表"
+            );
+
+            //設定下載按鈕 <-- 一定要呼叫這個函數，不然沒有下載功能
+            so.installDownloadBtn();
+
+            //產生 "開啟自評表按鈕"
+            so.renderBtn(
+                //自評表按鈕插入位置
+                document.querySelector("#info"),
+                //自評表按鈕文字
+                "開啟自評表"
+            );
+        });
+    </script>
+    <script type="module">
+
+        import * as THREE from './build/three.module.js';
+        import { GUI } from './jsm/jsm/libs/dat.gui.module.js';
+        import { OrbitControls } from './jsm/jsm/controls/OrbitControls.js';
+        import { OutlineEffect } from './jsm/jsm/effects/OutlineEffect.js';
+        import { MMDLoader } from './jsm/jsm/loaders/MMDLoader.js';
+        import { MMDAnimationHelper } from './jsm/jsm/animation/MMDAnimationHelper.js';
+
+        let camera, scene, renderer, effect;
+        let mesh;
+        let SCREEN_WIDTH = window.innerWidth;
+        let SCREEN_HEIGHT = window.innerHeight;
+        let aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
+        let frustumSize = 30;
+        let reye_index = 0, leye_index = 0, head_index = 0;
+        let gui = new GUI();
+        let standardlist = {
+            eyebrow_troubled_left: 0, eyebrow_troubled_right: 0, eyebrow_angry_left: 0, eyebrow_angry_right: 0, eyebrow_serious_left: 0, eyebrow_serious_right: 0
+            , eyebrow_happy_left: 0, eyebrow_happy_right: 0, eyebrow_lowered_left: 0, eyebrow_lowered_right: 0, eyebrow_raised_left: 0, eyebrow_raised_right: 0, eye_wink_left: 0, eye_wink_right: 0
+            , eye_happy_wink_left: 0, eye_happy_wink_right: 0, eye_relaxed_left: 0, eye_relaxed_right: 0, eye_unimpressed_left: 0, eye_unimpressed_right: 0, eye_raised_lower_eyelid_left: 0,
+            eye_raised_lower_eyelid_right: 0, eye_surprised_left: 0, eye_surprised_right: 0, iris_small_left: 0, iris_small_right: 0, mouth_aaa: 0, mouth_iii: 0, mouth_uuu: 0, mouth_eee: 0, mouth_ooo: 0
+            , mouth_delta: 0, mouth_smirk: 0, mouth_raised_corner_left: 0, mouth_raised_corner_right: 0, mouth_lowered_corner_left: 0, mouth_lowered_corner_right: 0, iris_rotation_x: 0, iris_rotation_y: 0, head_x: 0, head_y: 0, head_z: 0
+        };
+        let loadstatus;
+        let data_json, data_json_length;
+        
+        let helper = new MMDAnimationHelper();
+        const loader = new MMDLoader();
+        
+        var MMD_id = 0;
+        var modelFile;
+
+        Ammo().then(function (AmmoLib) {
+            Ammo = AmmoLib;
+            getjson();
+            animate();
+        });
+
+        function init() {
+            const container = document.createElement('div');
+            document.body.appendChild(container);
+
+            camera = new THREE.OrthographicCamera(frustumSize * aspect / - 2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / - 2, 0.1, 1000);
+            camera.position.z = 25;
+
+            // scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xffffff);
+
+            const ambient = new THREE.AmbientLight(0x666666);
+            scene.add(ambient);
+
+            const directionalLight = new THREE.DirectionalLight(0x887766);
+            directionalLight.position.set(- 1, 1, 1).normalize();
+            scene.add(directionalLight);
+
+            //renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+            effect = new OutlineEffect(renderer);
+
+            modelFile = data_json.modellist[MMD_id].location;
+            loader.load(modelFile, function (object) {
+                mesh = object;
+                mesh.position.y = -10;
+                scene.add(mesh);
+                findeye_index();
+                initGui();
+                loadstatus = 1;
+            }, onProgress, null);
+
+            // Listener
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('keydown', key_press);
+
+            const cameracontrols = new OrbitControls(camera, renderer.domElement);
+            cameracontrols.minDistance = 10;
+            cameracontrols.maxDistance = 100;
+            cameracontrols.enableRotate = false;
+        }
+
+        function onWindowResize() {
+            SCREEN_WIDTH = window.innerWidth;
+            SCREEN_HEIGHT = window.innerHeight;
+            aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
+
+            effect.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+            camera.left = frustumSize * aspect / - 2;
+            camera.right = frustumSize * aspect / 2;
+            camera.top = frustumSize / 2;
+            camera.bottom = - frustumSize / 2;
+            camera.updateProjectionMatrix();
+        }
+
+        // model
+        function onProgress(xhr) {
+            if (xhr.lengthComputable) {
+                const percentComplete = xhr.loaded / xhr.total * 100;
+                console.log(Math.round(percentComplete, 2) + '% downloaded');
+            }
+        }
+
+        function initGui() {
+            gui = new GUI();
+            const controls = {};
+            const keys = [];
+            const morphs = gui.addFolder('Morphs');
+
+            function initControls() {
+                for (const key in standardlist) {
+                    controls[key] = 0.0;
+                }
+            }
+
+            function initKeys() {
+                for (const key in standardlist) {
+                    keys.push(key);
+                }
+            }
+
+            function initMorphs() {
+                //此程式只有eye_happy_wink_left能控制
+                let i = 0;
+                for (const key in standardlist) {
+                    if (i != 14) {
+                        morphs.add(controls, key, 0.0, 0.0, 0.01).onChange(onChangeMorph);
+                    }
+                    else {
+                        morphs.add(controls, key, 0.0, 1.0, 0.01).onChange(onChangeMorph);
+                    }
+                    i++;
+                }
+            }
+
+            function onChangeMorph() {
+                //此程式只有eye_happy_wink_left能控制
+                const key = keys[14];
+                const value = controls[key];
+                mesh.morphTargetInfluences[0] = value;
+            }
+
+            initControls();
+            initKeys();
+            initMorphs();
+
+            onChangeMorph();
+            morphs.open();
+        }
+
+        function findeye_index() {
+            for (let i = 0; i < mesh.skeleton.bones.length; i++) {
+                if (mesh.skeleton.bones[i].name == '左目') {
+                    leye_index = i;
+                }
+                else if (mesh.skeleton.bones[i].name == '右目') {
+                    reye_index = i;
+                }
+                else if (mesh.skeleton.bones[i].name == '頭') {
+                    head_index = i;
+                }
+            }
+        }
+
+        function getjson() {
+            var xmlhttp = new XMLHttpRequest();
+            var url = "model_data.json";
+            xmlhttp.onreadystatechange = function() {
+                if (this.readyState ==4 && this.status == 200) {
+                    data_json = JSON.parse(this.responseText);
+                    data_json_length = Object.keys(data_json.modellist).length;
+                    console.log(data_json);
+                    init();
+                }
+            };
+            xmlhttp.open("GET", url, true);
+            xmlhttp.send();
+        }
+
+        // MMD reader
+		function read_MMD( MMD_id ) {
+			scene.remove(mesh);
+            gui.destroy();
+			
+            modelFile = data_json.modellist[MMD_id].location;
+            loader.load(modelFile, function (object) {
+                mesh = object;
+                mesh.position.y = -10;
+                scene.add(mesh);
+                findeye_index();
+                initGui();
+                // loadstatus = 1;
+            }, onProgress, null);
+		}
+
+        function key_press( event ) {
+			var filename;
+			switch( event.which ){
+				// press a --> previous
+				case 65:
+                case 97:
+					MMD_id = (MMD_id + data_json_length - 1) % data_json_length;
+					read_MMD(MMD_id);
+					break;
+					
+				// press d --> next
+				case 68:
+                case 100:
+					MMD_id = (MMD_id + 1) % data_json_length;
+					read_MMD(MMD_id);
+					break;
+                
+                // set default
+                default:
+                    break;
+            }
+		}
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            render();
+        }
+
+        function render() {
+            if (loadstatus == 1) {
+                effect.render(scene, camera);
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>
