@@ -101,6 +101,7 @@
         
         var MMD_id = 0;
         var modelFile;
+        var dictionary;
 
         Ammo().then(function (AmmoLib) {
             Ammo = AmmoLib;
@@ -194,11 +195,23 @@
             }
 
             function initMorphs() {
-                //此程式只有eye_happy_wink_left能控制
                 let i = 0;
+
                 for (const key in standardlist) {
-                    if (i != 14) {
-                        morphs.add(controls, key, 0.0, 0.0, 0.01).onChange(onChangeMorph);
+                    // iris_rotation_x
+                    if (i == 37) {
+                        morphs.add(controls, key, data_json.modellist[MMD_id].LXNA, data_json.modellist[MMD_id].LXPA, 0.01).onChange(onChangeMorph);
+                        // morphs.add(controls, key, -1.0, 1.0, 0.01).onChange(onChangeMorph);
+                    }
+                    // iris_rotation_y
+                    else if (i == 38) {
+                        morphs.add(controls, key, data_json.modellist[MMD_id].LYNA, data_json.modellist[MMD_id].LYPA, 0.01).onChange(onChangeMorph);
+                        // morphs.add(controls, key, -1.0, 1.0, 0.01).onChange(onChangeMorph);
+                    }
+                    // head_x, head_y, head_z
+                    else if (39 <= i && i <= 41) {
+                        morphs.add(controls, key, -15.0, 15.0, 0.01).onChange(onChangeMorph);
+                        // morphs.add(controls, key, -1.0, 1.0, 0.01).onChange(onChangeMorph);
                     }
                     else {
                         morphs.add(controls, key, 0.0, 1.0, 0.01).onChange(onChangeMorph);
@@ -208,10 +221,51 @@
             }
 
             function onChangeMorph() {
-                //此程式只有eye_happy_wink_left能控制
-                const key = keys[14];
-                const value = controls[key];
-                mesh.morphTargetInfluences[0] = value;
+                let dict_list = [];
+                for (const std_key in standardlist) {
+                    dict_list.push(std_key);
+                }
+
+                for (let i = 0; i < keys.length; i++) {
+                    if (i < 37) {
+                        const key = keys[ i ];
+                        const value = controls[dict_list[26]];
+                        mesh.morphTargetInfluences[ i ] = value;
+                        // console.log(data_json.modellist[MMD_id][key])
+                    }
+                    else if (i == 37) {
+                        const key = keys[ i ];
+                        const value = (1 - (-1)) * ((controls[key] - data_json.modellist[MMD_id].LXNA) / (data_json.modellist[MMD_id].LXPA - data_json.modellist[MMD_id].LXNA)) + (-1);
+                        // mesh.morphTargetInfluences[ i ] = value;
+                        mesh.skeleton.bones[leye_index].rotation.x = controls[key] * Math.PI / 180;
+                        mesh.skeleton.bones[reye_index].rotation.x = controls[key] * Math.PI / 180;
+                    }
+                    else if (i == 38) {
+                        const key = keys[ i ];
+                        const value = (1 - (-1)) * ((controls[key] - data_json.modellist[MMD_id].LYNA) / (data_json.modellist[MMD_id].LYPA - data_json.modellist[MMD_id].LXNA)) + (-1);
+                        // mesh.morphTargetInfluences[ i ] = value;
+                        mesh.skeleton.bones[leye_index].rotation.y = controls[key] * Math.PI / 180;
+                        mesh.skeleton.bones[reye_index].rotation.y = controls[key] * Math.PI / 180;
+                    }
+                    else if (i == 39) {
+                        const key = keys[ i ];
+                        const value = (1 - (-1)) * ((controls[key] - (-15.0)) / (15.0 - (-15.0))) + (-1);
+                        // mesh.morphTargetInfluences[ i ] = value;
+                        mesh.skeleton.bones[head_index].rotation.x = controls[key] * Math.PI / 180;
+                    }
+                    else if (i == 40) {
+                        const key = keys[ i ];
+                        const value = (1 - (-1)) * ((controls[key] - (-15.0)) / (15.0 - (-15.0))) + (-1);
+                        // mesh.morphTargetInfluences[ i ] = value;
+                        mesh.skeleton.bones[head_index].rotation.y = controls[key] * Math.PI / 180;
+                    }
+                    else if (i == 41) {
+                        const key = keys[ i ];
+                        const value = (1 - (-1)) * ((controls[key] - (-15.0)) / (15.0 - (-15.0))) + (-1);
+                        // mesh.morphTargetInfluences[ i ] = value;
+                        mesh.skeleton.bones[head_index].rotation.z = controls[key] * Math.PI / 180;
+                    }
+                }
             }
 
             initControls();
