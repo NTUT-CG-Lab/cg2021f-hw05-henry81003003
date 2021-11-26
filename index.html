@@ -195,28 +195,25 @@
             }
 
             function initMorphs() {
-                let i = 0;
-
                 for (const key in standardlist) {
                     // iris_rotation_x
-                    if (i == 37) {
+                    if (key == "iris_rotation_x") {
                         morphs.add(controls, key, data_json.modellist[MMD_id].LXNA, data_json.modellist[MMD_id].LXPA, 0.01).onChange(onChangeMorph);
                         // morphs.add(controls, key, -1.0, 1.0, 0.01).onChange(onChangeMorph);
                     }
                     // iris_rotation_y
-                    else if (i == 38) {
+                    else if (key == "iris_rotation_y") {
                         morphs.add(controls, key, data_json.modellist[MMD_id].LYNA, data_json.modellist[MMD_id].LYPA, 0.01).onChange(onChangeMorph);
                         // morphs.add(controls, key, -1.0, 1.0, 0.01).onChange(onChangeMorph);
                     }
                     // head_x, head_y, head_z
-                    else if (39 <= i && i <= 41) {
+                    else if (key == "head_x" || key == "head_y" || key == "head_z") {
                         morphs.add(controls, key, -15.0, 15.0, 0.01).onChange(onChangeMorph);
                         // morphs.add(controls, key, -1.0, 1.0, 0.01).onChange(onChangeMorph);
                     }
                     else {
                         morphs.add(controls, key, 0.0, 1.0, 0.01).onChange(onChangeMorph);
                     }
-                    i++;
                 }
             }
 
